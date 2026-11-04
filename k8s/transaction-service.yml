@@ -1,0 +1,119 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: transaction-service
+  namespace: banking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: transaction-service
+  template:
+    metadata:
+      labels:
+        app: transaction-service
+    spec:
+      containers:
+      - name: transaction-service
+        image: transaction-service:v1
+        env:
+        - name: SPRING_DATASOURCE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: BANKING_DB_JDBC
+        - name: SPRING_DATASOURCE_USERNAME
+          value: "bankuser"
+        - name: SPRING_DATASOURCE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: banking-secrets
+              key: POSTGRES_PASSWORD
+        - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+          value: "update"
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: REDIS_HOST
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: REDIS_PORT
+        - name: SERVER_PORT
+          value: "8080"
+        - name: FRONTEND_ORIGIN
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: FRONTEND_ORIGIN
+        ports:
+        - containerPort: 8080
+
+# ---
+# apiVersion: apps/v1
+# kind: Deployment
+# metadata:
+#   name: transaction-service
+#   namespace: banking
+# spec:
+#   replicas: 1
+#   selector:
+#     matchLabels:
+#       app: transaction-service
+#   template:
+#     metadata:
+#       labels:
+#         app: transaction-service
+#     spec:
+#       containers:
+#       - name: transaction-service
+#         image: transaction-service:v1
+#         env:
+#         # 1. Safely source your secret password into a temporary container hook
+#         - name: POSTGRES_PASSWORD
+#           valueFrom:
+#             secretKeyRef:
+#               name: banking-secrets
+#               key: POSTGRES_PASSWORD
+#         # 2. Assembles the JDBC connection directly with the verified StatefulSet network alias
+#         - name: SPRING_DATASOURCE_URL
+#           value: "jdbc:postgresql://banking-postgres-service:5432/bankingdb"
+#         - name: SPRING_DATASOURCE_USERNAME
+#           value: "bankuser"
+#         # 3. Securely resolves your database authentication string
+#         - name: SPRING_DATASOURCE_PASSWORD
+#           value: "$(POSTGRES_PASSWORD)"
+#         - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+#           value: "update"
+#         - name: KAFKA_BOOTSTRAP_SERVERS
+#           valueFrom:
+#             configMapKeyRef:
+#               name: banking-config
+#               key: KAFKA_BOOTSTRAP_SERVERS
+#         - name: REDIS_HOST
+#           valueFrom:
+#             configMapKeyRef:
+#               name: banking-config
+#               key: REDIS_HOST
+#         - name: REDIS_PORT
+#           valueFrom:
+#             configMapKeyRef:
+#               name: banking-config
+#               key: REDIS_PORT
+#         - name: SERVER_PORT
+#           value: "8080"
+#         - name: FRONTEND_ORIGIN
+#           valueFrom:
+#             configMapKeyRef:
+#               name: banking-config
+#               key: FRONTEND_ORIGIN
+#         ports:
+#         - containerPort: 8080

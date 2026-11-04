@@ -51,3 +51,11 @@ replay_pid*
 **/~$*
 **/*_bk
 **/soem logs
+
+k8s/config*
+
+/home/kunle/Documents/final-proj/sre2026-final-project/k8s/configmap.yml
+k8s/configmap.yml
+k8s/secret.yml
+
+

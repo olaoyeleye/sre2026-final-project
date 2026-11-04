@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-postgres-init-script
+  namespace: banking
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(50) PRIMARY KEY,
+        full_name VARCHAR(100) NOT NULL,
+        email VARCHAR(120) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS accounts (
+        user_id VARCHAR(50) PRIMARY KEY,
+        balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS transactions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        transaction_type VARCHAR(30) NOT NULL,
+        amount NUMERIC(12,2) NOT NULL,
+        reference VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS activities (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        activity_type VARCHAR(50) NOT NULL,
+        description TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: banking-postgres
+  namespace: banking
+spec:
+  serviceName: banking-postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: banking-postgres
+  template:
+    metadata:
+      labels:
+        app: banking-postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_DB
+          value: "bankingdb"
+        - name: POSTGRES_USER
+          value: "bankuser"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: banking-secrets
+              key: POSTGRES_PASSWORD
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: banking-db-volume
+          mountPath: /var/lib/postgresql/data
+        # Mounts the initialization script directory
+        - name: init-script-volume
+          mountPath: /docker-entrypoint-initdb.d
+      volumes:
+      # References the ConfigMap containing your SQL schema
+      - name: init-script-volume
+        configMap:
+          name: banking-postgres-init-script
+  volumeClaimTemplates:
+  - metadata:
+      name: banking-db-volume
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 5Gi

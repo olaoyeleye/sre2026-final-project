@@ -1,0 +1,203 @@
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: banking-postgres
+#   namespace: banking
+# spec:
+#   ports:
+#   - port: 5432
+#     targetPort: 5432
+#   selector:
+#     app: banking-postgres
+#   type: ClusterIP
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-postgres-service
+  namespace: banking
+  labels:
+    app: banking-postgres
+spec:
+  clusterIP: None # Defines it as a headless service for the StatefulSet
+  ports:
+  - port: 5432
+    name: postgres
+  selector:
+    app: banking-postgres
+
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-postgres-service
+  namespace: banking
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: keycloak-postgres
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: banking
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: redis
+  type: ClusterIP
+
+
+#messaging service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-service
+  namespace: banking
+spec:
+  ports:
+  - name: tcp-kafka
+    port: 9092
+    targetPort: 9092
+  - name: tcp-jmx
+    port: 9101
+    targetPort: 9101
+  selector:
+    app: kafka
+  type: ClusterIP
+
+ 
+# App services
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: banking
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: keycloak
+  type: ClusterIP
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: banking
+spec:
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: keycloak
+  type: ClusterIP
+
+
+
+
+
+
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: activity-service
+  namespace: banking
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: activity-service
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: transaction-service
+  namespace: banking
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: transaction-service
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: banking
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: user-service
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: finance-agent
+  namespace: banking
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    app: finance-agent
+  type: ClusterIP
+
+---
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: bank-frontend
+#   namespace: banking
+# spec:
+#   type: ClusterIP
+#   ports:
+#     - protocol: TCP
+#       port: 3000
+#       targetPort: 3000   
+#   selector:
+#     app: bank-frontend   
+
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: bank-frontend
+  namespace: banking
+  labels:
+    app: bank-frontend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000       # Keep this at 3000 since your Ingress expects 3000
+    targetPort: 80   # FIX: Updated from 3000 to match internal container NGINX port 80
+    protocol: TCP
+    name: http
+  selector:
+    app: bank-frontend

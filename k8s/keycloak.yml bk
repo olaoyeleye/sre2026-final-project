@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: banking
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+      - name: keycloak
+        image: quay.io/keycloak/keycloak:26.3.5
+        args: ["start-dev"]
+        env:
+        # Reverse Proxy Parameters (Sourced from ConfigMap)
+        - name: KC_PROXY_HEADERS
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KC_PROXY_HEADERS
+        - name: KC_HTTP_ENABLED
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KC_HTTP_ENABLED
+        - name: KC_HOSTNAME_STRICT
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KC_HOSTNAME_STRICT
+        - name: KC_HOSTNAME_STRICT_HTTPS
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KC_HOSTNAME_STRICT_HTTPS
+        - name: KC_HTTP_RELATIVE_PATH
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KC_HTTP_RELATIVE_PATH
+        - name: KC_HOSTNAME_URL
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KC_HOSTNAME_URL
+        - name: KC_HOSTNAME_ADMIN_URL
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KC_HOSTNAME_ADMIN_URL
+
+        # Bootstrap Console Credentials (Kept inside Secrets for security)
+        - name: KC_BOOTSTRAP_ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: banking-secrets
+              key: KEYCLOAK_ADMIN_USERNAME
+        - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: banking-secrets
+              key: KEYCLOAK_ADMIN_PASSWORD
+
+        # Internal Database Parameters (Sourced from ConfigMap)
+        - name: KC_DB
+          value: "postgres"
+        - name: KC_DB_URL
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KEYCLOAK_DB_URL
+        - name: KC_DB_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KEYCLOAK_DB_USER
+        - name: KC_DB_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KEYCLOAK_DB_PASSWORD
+        ports:
+        - containerPort: 8080
+          name: http

@@ -1,0 +1,41 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finance-agent
+  namespace: banking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: finance-agent
+  template:
+    metadata:
+      labels:
+        app: finance-agent
+    spec:
+      containers:
+      - name: finance-agent
+        image: finance-agent:v1
+        env:
+        - name: KEYCLOAK_URL
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KEYCLOAK_URL
+        - name: KEYCLOAK_ISSUER
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KEYCLOAK_URL
+          # Appends realm dynamics manually if needed, or structured inside your entrypoint code logic.
+        - name: KEYCLOAK_REALM
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KEYCLOAK_REALM
+        - name: KEYCLOAK_AUDIENCE
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KEYCLOAK_AUDIENCE  # Added the missing key definition

@@ -12,7 +12,7 @@ FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 KEYCLOAK_URL = os.getenv("KEYCLOAK_URL", "http://host.docker.internal:8080").rstrip("/")
 KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "banking")
 KEYCLOAK_ADMIN_CLIENT_ID = os.getenv("KEYCLOAK_ADMIN_CLIENT_ID", "banking-provisioner")
-KEYCLOAK_ADMIN_CLIENT_SECRET = os.getenv("KEYCLOAK_ADMIN_CLIENT_SECRET", "")
+KEYCLOAK_ADMIN_CLIENT_SECRET = os.getenv("KEYCLOAK_ADMIN_CLIENT_SECRET", "FKa2xdzlnQ85MMlXTBl7GOocb4aY2H9L")
 
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL is required")

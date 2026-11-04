@@ -1,5 +1,54 @@
 services:
-  postgres:
+
+  # ==========================================
+  # PostgreSQL - stores Keycloak configuration
+  # ==========================================
+  keycloak-postgres:
+    image: postgres:16
+    container_name: keycloak-postgres2
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: keycloak
+      POSTGRES_PASSWORD: keycloak
+    volumes:
+      - postgres_data2:/var/lib/postgresql/data2
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak -d keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # Keycloak OAuth Server
+  # ==========================================
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    container_name: keycloak2
+    restart: unless-stopped
+    command: start-dev
+    environment:
+      # Keycloak admin credentials
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+
+      # Internal Database connection parameters
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: keycloak
+      KC_HOSTNAME_STRICT: "false"
+    ports:
+      - "8080:8080"
+    depends_on:
+      keycloak-postgres:
+        condition: service_healthy
+
+
+  # ==========================================
+  # PostgreSQL - Application Core Database
+  # ==========================================
+  banking-postgres:
     image: postgres:15
     container_name: banking-postgres
     environment:
@@ -9,15 +58,21 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      #- postgres_data:/var/lib/postgresql/data
       - ./db-init/init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  # ==========================================
+  # Cache Engine
+  # ==========================================
   redis:
     image: redis:7
     container_name: banking-redis
     ports:
       - "6379:6379"
 
+  # ==========================================
+  # Distributed Messaging Queue
+  # ==========================================
   kafka:
     image: confluentinc/cp-kafka:8.1.1
     hostname: kafka
@@ -41,15 +96,16 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
       KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
-      # Replace CLUSTER_ID with a unique base64 UUID using "bin/kafka-storage.sh random-uuid"
-      # See https://docs.confluent.io/kafka/operations-tools/kafka-tools.html#kafka-storage-sh
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
 
+  # ==========================================
+  # Microservices
+  # ==========================================
   user-service:
     build: ./user-service
     container_name: user-service
     environment:
-      DATABASE_URL: postgresql://bankuser:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in techbleat-global-bank-backend/.env}@postgres:5432/bankingdb
+      DATABASE_URL: postgresql://bankuser:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in techbleat-global-bank-backend/.env}@banking-postgres:5432/bankingdb
       FRONTEND_ORIGIN: http://localhost:3000
       KEYCLOAK_URL: ${KEYCLOAK_URL:-http://host.docker.internal:8080}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-banking}
@@ -57,12 +113,14 @@ services:
       KEYCLOAK_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET:-}
     ports:
       - "8000:8000"
+    depends_on:
+      - banking-postgres
 
   transaction-service:
     build: ./transaction-service
     container_name: transaction-service
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/bankingdb
+      SPRING_DATASOURCE_URL: jdbc:postgresql://banking-postgres:5432/bankingdb
       SPRING_DATASOURCE_USERNAME: bankuser
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in techbleat-global-bank-backend/.env}
       SPRING_JPA_HIBERNATE_DDL_AUTO: update
@@ -73,16 +131,23 @@ services:
       FRONTEND_ORIGIN: http://localhost:3000
     ports:
       - "8090:8080"
+    depends_on:
+      - banking-postgres
+      - kafka
+      - redis
 
   activity-service:
     build: ./activity-service
     container_name: activity-service
     environment:
-      DATABASE_URL: postgresql://bankuser:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in techbleat-global-bank-backend/.env}@postgres:5432/bankingdb
+      DATABASE_URL: postgresql://bankuser:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in techbleat-global-bank-backend/.env}@banking-postgres:5432/bankingdb
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       FRONTEND_ORIGIN: http://localhost:3000
     ports:
       - "8001:8001"
+    depends_on:
+      - banking-postgres
+      - kafka
 
   finance-agent:
     build:
@@ -113,3 +178,4 @@ services:
 
 volumes:
   postgres_data:
+  postgres_data2:

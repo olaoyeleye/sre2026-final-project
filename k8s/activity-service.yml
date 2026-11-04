@@ -1,0 +1,42 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: activity-service
+  namespace: banking
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: activity-service
+  template:
+    metadata:
+      labels:
+        app: activity-service
+    spec:
+      containers:
+      - name: activity-service
+        image: activity-service:v1
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: banking-secrets
+              key: POSTGRES_PASSWORD
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: BANKING_DB_URL
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: KAFKA_BOOTSTRAP_SERVERS
+        - name: FRONTEND_ORIGIN
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: FRONTEND_ORIGIN
+        ports:
+        - containerPort: 8001
