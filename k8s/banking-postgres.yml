@@ -55,6 +55,8 @@ spec:
       - name: postgres
         image: postgres:15
         env:
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
         - name: POSTGRES_DB
           value: "bankingdb"
         - name: POSTGRES_USER
@@ -82,6 +84,7 @@ spec:
       name: banking-db-volume
     spec:
       accessModes: [ "ReadWriteOnce" ]
+      storageClassName: auto-ebs-sc
       resources:
         requests:
           storage: 5Gi
