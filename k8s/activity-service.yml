@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: activity-service
-        image: activity-service:v1
+        image: 229378727509.dkr.ecr.eu-west-1.amazonaws.com/activity-service:v1
         env:
         - name: POSTGRES_PASSWORD
           valueFrom:

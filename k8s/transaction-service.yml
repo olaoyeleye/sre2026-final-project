@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: transaction-service
-        image: transaction-service:v1
+        image: 229378727509.dkr.ecr.eu-west-1.amazonaws.com/transaction-service:v1
         env:
         - name: SPRING_DATASOURCE_URL
           valueFrom:
