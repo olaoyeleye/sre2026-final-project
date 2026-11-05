@@ -1,4 +1,5 @@
 ---
+# Ingress 1: Keycloak + frontend (no path rewriting)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -12,34 +13,9 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  # No host set, so this matches the load balancer hostname.
-  # When you have a domain, add:  - host: app.yourdomain.com
   - host: kunleoyeleye-bank.com
     http:
       paths:
-      # Backend APIs
-      - path: /users
-        pathType: Prefix
-        backend:
-          service:
-            name: user-service
-            port:
-              number: 8080
-      - path: /transactions
-        pathType: Prefix
-        backend:
-          service:
-            name: transaction-service
-            port:
-              number: 8080
-      - path: /activities
-        pathType: Prefix
-        backend:
-          service:
-            name: activity-service
-            port:
-              number: 8080
-
       # Keycloak routes
       - path: /admin
         pathType: Prefix
@@ -85,3 +61,50 @@ spec:
             name: bank-frontend
             port:
               number: 3000
+---
+# Ingress 2: backend APIs. The frontend calls /user-api, /transaction-api,
+# /activity-api and /finance-agent-api; the prefix is stripped before
+# the request reaches the service (same as the vite dev proxy).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: banking-api-ingress
+  namespace: banking
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: kunleoyeleye-bank.com
+    http:
+      paths:
+      - path: /user-api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: user-service
+            port:
+              number: 8080
+      - path: /transaction-api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: transaction-service
+            port:
+              number: 8080
+      - path: /activity-api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: activity-service
+            port:
+              number: 8080
+      - path: /finance-agent-api(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: finance-agent
+            port:
+              number: 8080
