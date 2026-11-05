@@ -14,7 +14,8 @@ spec:
   rules:
   # No host set, so this matches the load balancer hostname.
   # When you have a domain, add:  - host: app.yourdomain.com
-  - http:
+  - host: kunleoyeleye-bank.com
+  http:
       paths:
       # Backend APIs
       - path: /users
