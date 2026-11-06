@@ -2,7 +2,7 @@ import Keycloak from "keycloak-js";
 
 const clientId = import.meta.env.VITE_KEYCLOAK_CLIENT_ID || "banking-frontend";
 const keycloak = new Keycloak({
-  url: import.meta.env.VITE_KEYCLOAK_URL || "http://localhost:8080",
+  url: import.meta.env.VITE_KEYCLOAK_URL || "https://kunleoyeleye-bank.com",   // "http://localhost:8080",
   realm: import.meta.env.VITE_KEYCLOAK_REALM || "banking",
   clientId,
 });
