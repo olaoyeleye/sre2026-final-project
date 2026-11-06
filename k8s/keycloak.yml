@@ -20,7 +20,7 @@ spec:
         image: quay.io/keycloak/keycloak:26.3.5
         args: ["start-dev"]
         env:
-        # Keycloak 26 Reverse Proxy & Host Parameters (Sourced from ConfigMap)
+        # Keycloak 26 Reverse Proxy & Host Parameters
         - name: KC_PROXY_HEADERS
           valueFrom:
             configMapKeyRef:
@@ -48,17 +48,6 @@ spec:
               key: KC_HOSTNAME
 
         # Keycloak 26 Bootstrap Admin Credentials
-        - name: KC_ADMIN_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: banking-secrets
-              key: KEYCLOAK_ADMIN_USERNAME
-        - name: KC_ADMIN_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: banking-secrets
-              key: KEYCLOAK_ADMIN_PASSWORD
-                # Keycloak 26 Bootstrap Admin Credentials (FIXED)
         - name: KC_BOOTSTRAP_ADMIN_USERNAME
           valueFrom:
             secretKeyRef:
@@ -70,10 +59,7 @@ spec:
               name: banking-secrets
               key: KC_BOOTSTRAP_ADMIN_PASSWORD
 
-
-
-
-        # PostgreSQL Configuration Matrix (FIXED: Property targets optimized for Quarkus)
+        # PostgreSQL Configuration Matrix
         - name: KC_DB
           value: "postgres"
         - name: KC_DB_URL
@@ -94,3 +80,28 @@ spec:
         ports:
         - containerPort: 8080
           name: http
+        
+        # AUTOMATED REALM INITIALIZATION ENGINE
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - |
+                # 1. Loop until Keycloak's HTTP port is open and fully operational
+                until curl -s http://localhost:8080/admin/master/console/ > /dev/null; do 
+                  sleep 3
+                done
+                
+                # 2. Authenticate against the core loopback engine to grab an access token
+                TOKEN=$(curl -s -X POST "http://localhost:8080/realms/master/protocol/openid-connect/token" \
+                  -d "username=admin" -d "password=admin" -d "grant_type=password" -d "client_id=admin-cli" \
+
+                  | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
+                
+                # 3. Request the creation of the missing 'banking' realm
+                curl -s -X POST "http://localhost:8080/admin/realms" \
+                  -H "Authorization: Bearer $TOKEN" \
+                  -H "Content-Type: application/json" \
+                  -d '{"realm": "banking", "enabled": true, "displayName": "Techbleat Global Banking"}'
