@@ -1,3 +1,63 @@
+---
+# Realm definition imported at startup (only if the realm does not exist yet).
+# ${FRONTEND_ORIGIN} and ${KEYCLOAK_ADMIN_CLIENT_SECRET} are replaced by Keycloak
+# with the container's environment variables, which come from banking-config
+# and banking-secrets below.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-realm
+  namespace: banking
+data:
+  banking-realm.json: |
+    {
+      "realm": "banking",
+      "enabled": true,
+      "displayName": "Techbleat Global Banking",
+      "sslRequired": "external",
+      "registrationAllowed": false,
+      "loginWithEmailAllowed": true,
+      "roles": {
+        "realm": [
+          { "name": "banking-customer" },
+          { "name": "banking-transact" },
+          { "name": "banking-ai-agent" }
+        ]
+      },
+      "clients": [
+        {
+          "clientId": "banking-frontend",
+          "enabled": true,
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": false,
+          "redirectUris": ["${FRONTEND_ORIGIN}/*"],
+          "webOrigins": ["${FRONTEND_ORIGIN}"],
+          "attributes": { "pkce.code.challenge.method": "S256" }
+        },
+        {
+          "clientId": "banking-provisioner",
+          "enabled": true,
+          "publicClient": false,
+          "clientAuthenticatorType": "client-secret",
+          "secret": "${KEYCLOAK_ADMIN_CLIENT_SECRET}",
+          "serviceAccountsEnabled": true,
+          "standardFlowEnabled": false,
+          "directAccessGrantsEnabled": false
+        }
+      ],
+      "users": [
+        {
+          "username": "service-account-banking-provisioner",
+          "enabled": true,
+          "serviceAccountClientId": "banking-provisioner",
+          "clientRoles": {
+            "realm-management": ["manage-users", "view-users", "query-users", "view-realm"]
+          }
+        }
+      ]
+    }
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,9 +78,9 @@ spec:
       containers:
       - name: keycloak
         image: quay.io/keycloak/keycloak:26.3.5
-        args: ["start-dev"]
+        args: ["start-dev", "--import-realm"]
         env:
-        # Keycloak 26 Reverse Proxy & Host Parameters
+        # Reverse proxy, hostname (this is what sets the token issuer) - from ConfigMap
         - name: KC_PROXY_HEADERS
           valueFrom:
             configMapKeyRef:
@@ -47,19 +107,31 @@ spec:
               name: banking-config
               key: KC_HOSTNAME
 
-        # Keycloak 26 Bootstrap Admin Credentials
+        # Bootstrap admin - from Secret
         - name: KC_BOOTSTRAP_ADMIN_USERNAME
           valueFrom:
             secretKeyRef:
               name: banking-secrets
-              key: KC_BOOTSTRAP_ADMIN_USERNAME
+              key: KEYCLOAK_ADMIN_USERNAME
         - name: KC_BOOTSTRAP_ADMIN_PASSWORD
           valueFrom:
             secretKeyRef:
               name: banking-secrets
-              key: KC_BOOTSTRAP_ADMIN_PASSWORD
+              key: KEYCLOAK_ADMIN_PASSWORD
 
-        # PostgreSQL Configuration Matrix
+        # Values substituted into the realm file
+        - name: FRONTEND_ORIGIN
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: FRONTEND_ORIGIN
+        - name: KEYCLOAK_ADMIN_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: banking-secrets
+              key: KEYCLOAK_ADMIN_CLIENT_SECRET
+
+        # PostgreSQL
         - name: KC_DB
           value: "postgres"
         - name: KC_DB_URL
@@ -80,28 +152,20 @@ spec:
         ports:
         - containerPort: 8080
           name: http
-        
-        # AUTOMATED REALM INITIALIZATION ENGINE
-        lifecycle:
-          postStart:
-            exec:
-              command:
-              - /bin/bash
-              - -c
-              - |
-                # 1. Loop until Keycloak's HTTP port is open and fully operational
-                until curl -s http://localhost:8080/admin/master/console/ > /dev/null; do 
-                  sleep 3
-                done
-                
-                # 2. Authenticate against the core loopback engine to grab an access token
-                TOKEN=$(curl -s -X POST "http://localhost:8080/realms/master/protocol/openid-connect/token" \
-                  -d "username=admin" -d "password=admin" -d "grant_type=password" -d "client_id=admin-cli" \
-
-                  | grep -o '"access_token":"[^"]*' | grep -o '[^"]*$')
-                
-                # 3. Request the creation of the missing 'banking' realm
-                curl -s -X POST "http://localhost:8080/admin/realms" \
-                  -H "Authorization: Bearer $TOKEN" \
-                  -H "Content-Type: application/json" \
-                  -d '{"realm": "banking", "enabled": true, "displayName": "Techbleat Global Banking"}'
+        readinessProbe:
+          tcpSocket:
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: 250m
+            memory: 768Mi
+        volumeMounts:
+        - name: realm-import
+          mountPath: /opt/keycloak/data/import
+          readOnly: true
+      volumes:
+      - name: realm-import
+        configMap:
+          name: banking-realm
