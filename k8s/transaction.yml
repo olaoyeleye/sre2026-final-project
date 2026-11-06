@@ -80,7 +80,7 @@ spec:
               drop: ["ALL"]
       containers:
         - name: transaction-service
-          image: registry.example.com/techbleat/transaction-service:1.0.0   # CHANGE_ME
+          image: 229378727509.dkr.ecr.eu-west-1.amazonaws.com/transaction-service:v1
           imagePullPolicy: IfNotPresent
           envFrom:
             - configMapRef:

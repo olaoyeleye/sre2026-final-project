@@ -60,7 +60,7 @@ spec:
               app.kubernetes.io/name: finance-agent
       containers:
         - name: finance-agent
-          image: registry.example.com/techbleat/finance-agent:1.0.0   # CHANGE_ME
+          image: 229378727509.dkr.ecr.eu-west-1.amazonaws.com/finance-agent:v1
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:
