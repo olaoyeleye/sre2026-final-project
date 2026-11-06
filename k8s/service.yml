@@ -1,0 +1,206 @@
+# =====================================================================
+# All in-cluster Services for the banking namespace
+# (The public LoadBalancer lives in ingress-controller.yml.)
+# =====================================================================
+
+# ---------- Keycloak Postgres (headless, backs the StatefulSet) ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-postgres
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: keycloak-postgres
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: keycloak-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+# ---------- Banking Postgres (headless, backs the StatefulSet) ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-postgres
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: banking-postgres
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: banking-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+# ---------- Keycloak ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: keycloak
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# ---------- Redis ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+---
+# ---------- Kafka: headless (per-broker DNS for KRaft + advertised listeners) ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-headless
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true   # controllers must find each other before ready
+  selector:
+    app.kubernetes.io/name: kafka
+  ports:
+    - name: client
+      port: 29092
+      targetPort: client
+    - name: controller
+      port: 29093
+      targetPort: controller
+---
+# ---------- Kafka: bootstrap for clients ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: kafka
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: kafka
+  ports:
+    - name: client
+      port: 29092
+      targetPort: client
+---
+# ---------- User service ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: user-service
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: user-service
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: user-service
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+---
+# ---------- Transaction service ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: transaction-service
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: transaction-service
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: transaction-service
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# ---------- Activity service ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: activity-service
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: activity-service
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: activity-service
+  ports:
+    - name: http
+      port: 8001
+      targetPort: http
+---
+# ---------- Finance agent ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: finance-agent
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: finance-agent
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: finance-agent
+  ports:
+    - name: http
+      port: 9001
+      targetPort: http
+---
+# ---------- Frontend ----------
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: frontend
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
