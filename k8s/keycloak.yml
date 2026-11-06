@@ -58,6 +58,20 @@ spec:
             secretKeyRef:
               name: banking-secrets
               key: KEYCLOAK_ADMIN_PASSWORD
+                # Keycloak 26 Bootstrap Admin Credentials (FIXED)
+        - name: KC_BOOTSTRAP_ADMIN_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: banking-secrets
+              key: KC_BOOTSTRAP_ADMIN_USERNAME
+        - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: banking-secrets
+              key: KC_BOOTSTRAP_ADMIN_PASSWORD
+
+
+
 
         # PostgreSQL Configuration Matrix (FIXED: Property targets optimized for Quarkus)
         - name: KC_DB
