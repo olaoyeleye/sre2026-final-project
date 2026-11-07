@@ -1,6 +1,8 @@
 # =====================================================================
 # Redis 7 - cache engine
-# Password-protected, memory-capped, no persistence (pure cache).
+# No authentication (matches the original compose setup).
+# Access is restricted to transaction-service by the NetworkPolicy below.
+# Memory-capped, no persistence (pure cache).
 # =====================================================================
 apiVersion: v1
 kind: ServiceAccount
@@ -52,8 +54,6 @@ spec:
           imagePullPolicy: IfNotPresent
           command: ["redis-server"]
           args:
-            - "--requirepass"
-            - "$(REDIS_PASSWORD)"
             - "--maxmemory"
             - "384mb"
             - "--maxmemory-policy"
@@ -62,17 +62,9 @@ spec:
             - ""
             - "--appendonly"
             - "no"
-          env:
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: redis-secret
-                  key: REDIS_PASSWORD
-            - name: REDISCLI_AUTH          # used by redis-cli in probes
-              valueFrom:
-                secretKeyRef:
-                  name: redis-secret
-                  key: REDIS_PASSWORD
+            # Without a password, protected mode would reject other pods
+            - "--protected-mode"
+            - "no"
           ports:
             - name: redis
               containerPort: 6379
