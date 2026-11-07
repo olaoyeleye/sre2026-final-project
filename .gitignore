@@ -29,6 +29,7 @@ replay_pid*
 !**/.env.example
 **/secrets.yaml
 **/secrets.yml
+**/config.yml
 
 # Frontend dependencies and build output
 **/node_modules/

@@ -1,0 +1,25 @@
+# Apply everything in the right order with ONE command:
+#   kubectl apply -k k8s/
+# (kustomize sorts by kind: Namespaces first, then config, then workloads)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - storageclass.yml
+  - ns.yml
+  - secrets.yml
+  - config.yml
+  - keycloak-realm.yml
+  - service.yml
+  - network-policies.yml
+  - keycloak-progress.yml
+  - banking-progress.yml
+  - redis.yml
+  - kafka.yml
+  - keycloak.yml
+  - user.yml
+  - transaction.yml
+  - activity.yml
+  - finance-agent.yml
+  - frontend.yml
+  - ingress-controller.yml
+  - ingress.yml

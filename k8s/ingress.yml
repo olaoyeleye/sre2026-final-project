@@ -1,0 +1,64 @@
+# =====================================================================
+# Public routing - one hostname, two backends.
+#
+#   /realms /resources /admin  -> keycloak:8080
+#   everything else            -> frontend:80
+#
+# The frontend's own nginx.conf (unchanged) then proxies
+#   /user-api/ /transaction-api/ /activity-api/ /finance-agent-api/
+# to the backend Services - exactly as in Docker Compose. No path
+# rewriting is needed here.
+#
+# TLS: Traefik serves its default certificate. With Cloudflare in front,
+# set Cloudflare SSL/TLS mode to "Full". For "Full (strict)", create a
+# Cloudflare Origin Certificate as secret "banking-tls" and uncomment
+# secretName below.
+# =====================================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: banking
+  namespace: banking
+  labels:
+    app.kubernetes.io/part-of: techbleat-bank
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - kunleoyeleye-bank.com
+      # secretName: banking-tls
+  rules:
+    - host: kunleoyeleye-bank.com
+      http:
+        paths:
+          - path: /realms
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http
+          - path: /resources
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  name: http
