@@ -1,0 +1,47 @@
+# =====================================================================
+# Namespace + guard-rails for the banking stack
+# =====================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: banking
+  labels:
+    app.kubernetes.io/part-of: techbleat-bank
+    # Istio injects an Envoy sidecar into every pod in this namespace
+    # (data stores opt out with the label sidecar.istio.io/inject: "false").
+    istio-injection: enabled
+    # The istio-init container needs NET_ADMIN/NET_RAW to set up iptables,
+    # which "baseline" forbids. Enforce "privileged", warn on "baseline".
+    # Installing the Istio CNI plugin removes istio-init and lets you
+    # tighten this to baseline.
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: baseline
+    pod-security.kubernetes.io/warn-version: latest
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: default-limits
+  namespace: banking
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 100m
+        memory: 128Mi
+      default:
+        memory: 512Mi
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: banking-quota
+  namespace: banking
+spec:
+  hard:
+    requests.cpu: "20"
+    requests.memory: 40Gi
+    limits.memory: 64Gi
+    persistentvolumeclaims: "10"
+    requests.storage: 200Gi
+    services.loadbalancers: "0"   # public traffic enters only via the Istio gateway

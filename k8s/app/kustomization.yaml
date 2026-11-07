@@ -1,0 +1,20 @@
+# Synced by Argo CD application "banking-app".
+# Secrets are deliberately NOT listed - create them with
+# scripts/create-secrets.sh so no credentials live in Git.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ns.yml
+  - config.yml
+  - keycloak-realm.yml
+  - service.yml
+  - keycloak-progress.yml
+  - banking-progress.yml
+  - redis.yml
+  - kafka.yml
+  - keycloak.yml
+  - user.yml
+  - transaction.yml
+  - activity.yml
+  - finance-agent.yml
+  - frontend.yml

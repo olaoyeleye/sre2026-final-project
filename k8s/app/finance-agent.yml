@@ -1,0 +1,160 @@
+# =====================================================================
+# Finance agent (FastAPI, port 9001)
+# Browser -> /finance-agent-api/... -> Istio gateway -> finance-agent:9001
+# OPENAI_API_KEY / OPENAI_MODEL come from finance-agent-secret
+# (created by scripts/create-secrets.sh, never stored in Git).
+# =====================================================================
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: finance-agent
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: finance-agent
+    app.kubernetes.io/part-of: techbleat-bank
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: finance-agent
+  namespace: banking
+  labels:
+    app.kubernetes.io/name: finance-agent
+    app.kubernetes.io/component: backend
+    app.kubernetes.io/part-of: techbleat-bank
+spec:
+  # No "replicas": the HPA owns the replica count
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: finance-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: finance-agent
+        app.kubernetes.io/component: backend
+        app.kubernetes.io/part-of: techbleat-bank
+    spec:
+      serviceAccountName: finance-agent
+      nodeSelector:
+        workload: apps     # "apps" node group
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: finance-agent
+      containers:
+        - name: finance-agent
+          image: 229378727509.dkr.ecr.eu-west-1.amazonaws.com/finance-agent:v1
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - secretRef:
+                name: finance-agent-secret
+          env:
+            - name: KEYCLOAK_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: banking-config
+                  key: KEYCLOAK_URL
+            - name: KEYCLOAK_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: banking-config
+                  key: KEYCLOAK_ISSUER
+            - name: KEYCLOAK_REALM
+              valueFrom:
+                configMapKeyRef:
+                  name: banking-config
+                  key: KEYCLOAK_REALM
+            - name: KEYCLOAK_AUDIENCE
+              valueFrom:
+                configMapKeyRef:
+                  name: banking-config
+                  key: KEYCLOAK_AUDIENCE
+            - name: TRANSACTION_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: banking-config
+                  key: TRANSACTION_API_URL
+          ports:
+            - name: http
+              containerPort: 9001
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: finance-agent
+  namespace: banking
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: finance-agent
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: finance-agent
+  namespace: banking
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: finance-agent
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

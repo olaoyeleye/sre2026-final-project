@@ -1,0 +1,20 @@
+# Argo CD project scoping what the banking apps may deploy and from where.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: banking
+  namespace: argocd
+spec:
+  description: Techbleat Global Bank - platform and application
+  sourceRepos:
+    - https://github.com/olaoyeleye/sre2026-final-project.git
+    - https://istio-release.storage.googleapis.com/charts
+    - https://charts.jetstack.io
+    - https://aws.github.io/eks-charts
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: "*"
+  # Istio and cert-manager install CRDs, webhooks and cluster roles
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"

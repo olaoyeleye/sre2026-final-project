@@ -1,0 +1,43 @@
+# =====================================================================
+# TLS certificate for the Istio gateway (Let's Encrypt via cert-manager)
+#
+# Uses the DNS-01 challenge through the Cloudflare API, which works while
+# Cloudflare proxies the domain. Needs the "cloudflare-api-token" secret in
+# the cert-manager namespace (scripts/create-secrets.sh creates it).
+# Token permissions: Zone -> DNS -> Edit, scoped to kunleoyeleye-bank.com.
+#
+# Cloudflare SSL/TLS mode: "Full (strict)".
+# =====================================================================
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: banking-tls
+  # Same namespace as the gateway pods, which read the secret
+  namespace: istio-ingress
+spec:
+  secretName: banking-tls
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+  dnsNames:
+    - kunleoyeleye-bank.com
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always

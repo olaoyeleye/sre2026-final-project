@@ -1,0 +1,24 @@
+# =====================================================================
+# App-of-apps. Apply ONCE by hand:
+#   kubectl apply -f argocd/project.yml -f argocd/root.yml
+# After that, everything under argocd/apps/ is created and kept in sync
+# by Argo CD from Git - push to feat-dev, Argo CD deploys it.
+# =====================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: banking-root
+  namespace: argocd
+spec:
+  project: banking
+  source:
+    repoURL: https://github.com/olaoyeleye/sre2026-final-project.git
+    targetRevision: feat-dev
+    path: argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

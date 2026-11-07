@@ -1,0 +1,15 @@
+# Default gp3 StorageClass, provisioned by the EBS CSI driver add-on
+# (installed by Terraform with its own Pod Identity role).
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+volumeBindingMode: WaitForFirstConsumer   # volume is created in the AZ the pod lands in
+allowVolumeExpansion: true
+reclaimPolicy: Retain                     # keep data volumes if a PVC is deleted by mistake
+parameters:
+  type: gp3
+  encrypted: "true"

@@ -1,0 +1,202 @@
+# =====================================================================
+# Mesh security for the banking namespace - no application code changes
+#
+#  1. STRICT mTLS between all sidecar-injected workloads.
+#  2. JWT validation at the sidecar (RequestAuthentication): a token with a
+#     bad signature, wrong issuer, wrong audience or past expiry gets 401.
+#  3. Deny-by-default authorization, then allow only the real call paths,
+#     requiring a valid token and the banking role the frontend expects:
+#        banking-customer  view balances / transactions / activity
+#        banking-transact  deposit / withdraw / transfer
+#        banking-ai-agent  AI assistant
+#     (roles are checked as Keycloak REALM roles - assign them that way)
+#
+# Data stores (Postgres x2, Kafka, Redis) run without sidecars and are
+# protected by the NetworkPolicies in their own manifests instead.
+# Health probes are rewritten by Istio and are not affected by these rules.
+# =====================================================================
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: banking
+spec:
+  mtls:
+    mode: STRICT
+---
+# Validates Keycloak tokens on every API workload
+apiVersion: security.istio.io/v1
+kind: RequestAuthentication
+metadata:
+  name: keycloak-jwt
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: backend
+  jwtRules:
+    - issuer: "https://kunleoyeleye-bank.com/realms/banking"
+      # Fetched by istiod (outside the mesh) via the public URL
+      jwksUri: "https://kunleoyeleye-bank.com/realms/banking/protocol/openid-connect/certs"
+      audiences: ["account"]
+      forwardOriginalToken: true     # apps still receive the Authorization header
+---
+# Empty spec = deny every request to every sidecar workload in the namespace
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: banking
+spec: {}
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: frontend
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: frontend
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-ingress/sa/istio-ingressgateway"]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: keycloak
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+  action: ALLOW
+  rules:
+    # Browser traffic via the gateway (login pages, token endpoint, JWKS)
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-ingress/sa/istio-ingressgateway"]
+    # Back-channel: user-service (token + admin API), finance-agent (JWKS)
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/banking/sa/user-service"
+              - "cluster.local/ns/banking/sa/finance-agent"
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: user-service
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: user-service
+  action: ALLOW
+  rules:
+    # Self-registration - the frontend calls this before the user has a token
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-ingress/sa/istio-ingressgateway"]
+      to:
+        - operation:
+            methods: ["POST"]
+            paths: ["/users"]
+    # Profile lookup after sign-in - any valid token
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-ingress/sa/istio-ingressgateway"]
+            requestPrincipals: ["*"]
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/users"]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: transaction-service
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: transaction-service
+  action: ALLOW
+  rules:
+    # Read balance / history
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-ingress/sa/istio-ingressgateway"]
+            requestPrincipals: ["*"]
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/balance/*", "/transactions/*"]
+      when:
+        - key: request.auth.claims[realm_access][roles]
+          values: ["banking-customer"]
+    # Move money
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-ingress/sa/istio-ingressgateway"]
+            requestPrincipals: ["*"]
+      to:
+        - operation:
+            methods: ["POST"]
+            paths: ["/transactions/deposit", "/transactions/withdraw", "/transactions/transfer"]
+      when:
+        - key: request.auth.claims[realm_access][roles]
+          values: ["banking-transact"]
+    # AI assistant tools (forwards the signed-in user's token)
+    - from:
+        - source:
+            principals: ["cluster.local/ns/banking/sa/finance-agent"]
+            requestPrincipals: ["*"]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: activity-service
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: activity-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-ingress/sa/istio-ingressgateway"]
+            requestPrincipals: ["*"]
+      to:
+        - operation:
+            methods: ["GET"]
+            paths: ["/activities/*"]
+      when:
+        - key: request.auth.claims[realm_access][roles]
+          values: ["banking-customer"]
+---
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: finance-agent
+  namespace: banking
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: finance-agent
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals: ["cluster.local/ns/istio-ingress/sa/istio-ingressgateway"]
+            requestPrincipals: ["*"]
+      to:
+        - operation:
+            paths: ["/chat", "/me"]
+      when:
+        - key: request.auth.claims[realm_access][roles]
+          values: ["banking-ai-agent"]

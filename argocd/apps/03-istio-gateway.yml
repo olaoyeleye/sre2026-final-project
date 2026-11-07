@@ -1,0 +1,49 @@
+# Wave -1: Istio ingress gateway behind an internet-facing AWS NLB
+# (NLB created by the AWS Load Balancer Controller - loadBalancerClass service.k8s.aws/nlb)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istio-ingressgateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  project: banking
+  source:
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    chart: gateway
+    targetRevision: 1.30.0
+    helm:
+      # Release name drives the pod label "istio: ingressgateway" and the
+      # ServiceAccount "istio-ingressgateway" used in k8s/mesh/security.yml
+      releaseName: istio-ingressgateway
+      valuesObject:
+        autoscaling:
+          minReplicas: 2
+          maxReplicas: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            memory: 512Mi
+        podDisruptionBudget:
+          minAvailable: 1
+        nodeSelector:
+          workload: system
+        service:
+          type: LoadBalancer
+          loadBalancerClass: service.k8s.aws/nlb
+          externalTrafficPolicy: Local
+          annotations:
+            service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+            service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-ingress
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

@@ -1,0 +1,26 @@
+# Wave 1: the banking application (namespace, config, data stores, services)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: banking-app
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: banking
+  source:
+    repoURL: https://github.com/olaoyeleye/sre2026-final-project.git
+    targetRevision: feat-dev
+    path: k8s/app
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: banking
+  syncPolicy:
+    automated:
+      # prune stays off for this app so a bad commit can never delete the
+      # StatefulSets/PVCs holding your data. Remove resources deliberately.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PruneLast=true

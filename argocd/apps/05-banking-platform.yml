@@ -1,0 +1,20 @@
+# Wave 0: cluster-level pieces the app needs (default gp3 StorageClass)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: banking-platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: banking
+  source:
+    repoURL: https://github.com/olaoyeleye/sre2026-final-project.git
+    targetRevision: feat-dev
+    path: k8s/platform
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

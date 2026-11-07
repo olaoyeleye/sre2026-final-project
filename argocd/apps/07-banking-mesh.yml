@@ -1,0 +1,29 @@
+# Wave 2: public routing, mTLS, authorization policies and TLS certificate
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: banking-mesh
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: banking
+  source:
+    repoURL: https://github.com/olaoyeleye/sre2026-final-project.git
+    targetRevision: feat-dev
+    path: k8s/mesh
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Istio / cert-manager CRDs may still be registering on first sync
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m

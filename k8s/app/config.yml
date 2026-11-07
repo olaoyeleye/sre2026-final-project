@@ -1,0 +1,114 @@
+# =====================================================================
+# Non-secret configuration - single source of truth.
+# (Replaces both config.yml and configmap.yml from the old k8s/ folder,
+#  which defined the same ConfigMaps twice and overwrote each other.)
+#
+# Public URL: https://kunleoyeleye-bank.com
+#   /                     -> frontend
+#   /realms, /resources,
+#   /admin                -> Keycloak
+#   /user-api/ ...        -> backends (routed by the Istio gateway)
+# =====================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-config
+  namespace: banking
+  labels:
+    app.kubernetes.io/part-of: techbleat-bank
+data:
+  # Browser origin (CORS). Calls are same-origin via the gateway, so this
+  # is belt-and-braces.
+  FRONTEND_ORIGIN: "https://kunleoyeleye-bank.com"
+
+  # Keycloak, in-cluster URL for back-channel calls (JWKS, token, admin API)
+  KEYCLOAK_URL: "http://keycloak.banking.svc.cluster.local:8080"
+  KEYCLOAK_REALM: "banking"
+  # Must equal KC_HOSTNAME + /realms/<realm> (the "iss" claim in tokens)
+  KEYCLOAK_ISSUER: "https://kunleoyeleye-bank.com/realms/banking"
+  KEYCLOAK_AUDIENCE: "account"
+  KEYCLOAK_ADMIN_CLIENT_ID: "banking-provisioner"
+
+  # Messaging / cache (Redis has no password - the code connects without auth)
+  KAFKA_BOOTSTRAP_SERVERS: "kafka.banking.svc.cluster.local:29092"
+  REDIS_HOST: "redis.banking.svc.cluster.local"
+  REDIS_PORT: "6379"
+
+  # Service-to-service (finance-agent -> transaction-service)
+  TRANSACTION_API_URL: "http://transaction-service.banking.svc.cluster.local:8080"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: transaction-service-config
+  namespace: banking
+  labels:
+    app.kubernetes.io/part-of: techbleat-bank
+data:
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://banking-postgres.banking.svc.cluster.local:5432/bankingdb"
+  SPRING_JPA_HIBERNATE_DDL_AUTO: "update"
+  SERVER_PORT: "8080"
+  JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-config
+  namespace: banking
+  labels:
+    app.kubernetes.io/part-of: techbleat-bank
+data:
+  KC_DB: "postgres"
+  KC_DB_URL: "jdbc:postgresql://keycloak-postgres.banking.svc.cluster.local:5432/keycloak"
+  # Public URL Keycloak puts in tokens and redirects. Exactly ONE entry.
+  KC_HOSTNAME: "https://kunleoyeleye-bank.com"
+  # Lets in-cluster services use the internal URL for back-channel calls
+  KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+  # TLS terminates at the Istio gateway
+  KC_HTTP_ENABLED: "true"
+  KC_PROXY_HEADERS: "xforwarded"
+  KC_HEALTH_ENABLED: "true"
+  KC_METRICS_ENABLED: "true"
+  KC_LOG_LEVEL: "info"
+  JAVA_OPTS_KC_HEAP: "-XX:MaxRAMPercentage=70"
+---
+# Same content as techbleat-global-bank-backend/db-init/init.sql.
+# Postgres only runs this on an EMPTY data volume.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-db-init
+  namespace: banking
+  labels:
+    app.kubernetes.io/part-of: techbleat-bank
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(50) PRIMARY KEY,
+        full_name VARCHAR(100) NOT NULL,
+        email VARCHAR(120) UNIQUE NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS accounts (
+        user_id VARCHAR(50) PRIMARY KEY,
+        balance NUMERIC(12,2) NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS transactions (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        transaction_type VARCHAR(30) NOT NULL,
+        amount NUMERIC(12,2) NOT NULL,
+        reference VARCHAR(100),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS activities (
+        id SERIAL PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        activity_type VARCHAR(50) NOT NULL,
+        description TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );

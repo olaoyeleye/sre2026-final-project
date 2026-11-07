@@ -1,0 +1,117 @@
+# =====================================================================
+# Public entry point - Istio ingress gateway (replaces Traefik + Ingress)
+#
+# One hostname, routed by path - exactly what the frontend code expects:
+#   /realms /resources /admin  -> keycloak:8080      (VITE_KEYCLOAK_URL)
+#   /user-api/*                -> user-service:8000         (prefix stripped)
+#   /transaction-api/*         -> transaction-service:8080  (prefix stripped)
+#   /activity-api/*            -> activity-service:8001     (prefix stripped)
+#   /finance-agent-api/*       -> finance-agent:9001        (prefix stripped)
+#   /*                         -> frontend:80
+# This mirrors the frontend's own nginx.conf / vite.config.js proxy rules,
+# but done at the gateway so every hop is mTLS inside the mesh.
+# =====================================================================
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: banking-gateway
+  # Must be the gateway's namespace: the TLS secret is read from here
+  namespace: istio-ingress
+spec:
+  selector:
+    istio: ingressgateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - kunleoyeleye-bank.com
+      tls:
+        httpsRedirect: true        # HTTP -> HTTPS (301)
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      hosts:
+        - kunleoyeleye-bank.com
+      tls:
+        mode: SIMPLE
+        credentialName: banking-tls   # issued by cert-manager (certificate.yml)
+        minProtocolVersion: TLSV1_2
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: banking
+  namespace: banking
+spec:
+  hosts:
+    - kunleoyeleye-bank.com
+  gateways:
+    - istio-ingress/banking-gateway
+  http:
+    - name: keycloak
+      match:
+        - uri:
+            prefix: /realms/
+        - uri:
+            prefix: /resources/
+        - uri:
+            prefix: /admin
+      route:
+        - destination:
+            host: keycloak.banking.svc.cluster.local
+            port:
+              number: 8080
+    - name: user-api
+      match:
+        - uri:
+            prefix: /user-api/
+      rewrite:
+        uri: /
+      route:
+        - destination:
+            host: user-service.banking.svc.cluster.local
+            port:
+              number: 8000
+    - name: transaction-api
+      match:
+        - uri:
+            prefix: /transaction-api/
+      rewrite:
+        uri: /
+      route:
+        - destination:
+            host: transaction-service.banking.svc.cluster.local
+            port:
+              number: 8080
+    - name: activity-api
+      match:
+        - uri:
+            prefix: /activity-api/
+      rewrite:
+        uri: /
+      route:
+        - destination:
+            host: activity-service.banking.svc.cluster.local
+            port:
+              number: 8001
+    - name: finance-agent-api
+      match:
+        - uri:
+            prefix: /finance-agent-api/
+      rewrite:
+        uri: /
+      timeout: 120s                 # LLM responses can be slow
+      route:
+        - destination:
+            host: finance-agent.banking.svc.cluster.local
+            port:
+              number: 9001
+    - name: frontend
+      route:
+        - destination:
+            host: frontend.banking.svc.cluster.local
+            port:
+              number: 80

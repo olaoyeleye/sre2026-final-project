@@ -1,0 +1,58 @@
+# Wave -2: Istio control plane (sidecar injection, mTLS certificates, config)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: istiod
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+spec:
+  project: banking
+  source:
+    repoURL: https://istio-release.storage.googleapis.com/charts
+    chart: istiod
+    targetRevision: 1.30.0
+    helm:
+      valuesObject:
+        # istiod chart >= 1.2x takes these at the top level (no "pilot:" key)
+        autoscaleMin: 2
+        nodeSelector:
+          workload: system
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+        meshConfig:
+          accessLogFile: /dev/stdout
+          defaultConfig:
+            # App containers start only after the sidecar is ready
+            holdApplicationUntilProxyStarts: true
+        global:
+          proxy:
+            # Per-pod sidecar size (default is larger than this app needs)
+            resources:
+              requests:
+                cpu: 50m
+                memory: 64Mi
+              limits:
+                memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: istio-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  # istiod patches these at runtime; without this Argo CD shows OutOfSync forever
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.failurePolicy
+        - .webhooks[]?.clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle

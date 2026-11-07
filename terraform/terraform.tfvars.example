@@ -1,0 +1,19 @@
+# Copy to terraform.tfvars and adjust.
+region             = "eu-west-1"
+cluster_name       = "banking-eks"
+kubernetes_version = "1.34"
+
+# Cheaper for a project/demo: one NAT gateway instead of three (~$65/month less)
+single_nat_gateway = false
+
+# Lock the Kubernetes API to your EC2 box's public IP (curl -s ifconfig.me)
+# endpoint_public_access_cidrs = ["203.0.113.10/32"]
+
+enable_network_policy = true
+
+# Override any node group sizing, e.g.
+# node_groups = {
+#   system = { instance_types = ["m6i.large"],  min_size = 2, max_size = 3, desired_size = 2, disk_size_gb = 50, capacity_type = "ON_DEMAND" }
+#   apps   = { instance_types = ["m6i.xlarge"], min_size = 2, max_size = 6, desired_size = 3, disk_size_gb = 50, capacity_type = "SPOT" }
+#   data   = { instance_types = ["r6i.large"],  min_size = 3, max_size = 4, desired_size = 3, disk_size_gb = 50, capacity_type = "ON_DEMAND" }
+# }

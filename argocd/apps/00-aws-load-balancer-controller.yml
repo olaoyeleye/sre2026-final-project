@@ -1,0 +1,46 @@
+# Wave -4: AWS Load Balancer Controller - creates the NLB for the Istio gateway.
+# Its IAM role is created by Terraform (terraform/iam.tf) and bound to the
+# "aws-load-balancer-controller" ServiceAccount via EKS Pod Identity.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aws-load-balancer-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+spec:
+  project: banking
+  source:
+    repoURL: https://aws.github.io/eks-charts
+    chart: aws-load-balancer-controller
+    targetRevision: 3.6.2
+    helm:
+      valuesObject:
+        clusterName: banking-eks          # = terraform output cluster_name
+        region: eu-west-1
+        vpcId: CHANGE_ME_vpc-xxxxxxxx     # = terraform output vpc_id
+        replicaCount: 2
+        serviceAccount:
+          create: true
+          name: aws-load-balancer-controller
+        nodeSelector:
+          workload: system
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+  # The chart regenerates its webhook certificate on every render
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: aws-load-balancer-tls
+      jsonPointers: ["/data"]
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions: [".webhooks[]?.clientConfig.caBundle"]
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions: [".webhooks[]?.clientConfig.caBundle"]
