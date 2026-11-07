@@ -1,0 +1,46 @@
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+metadata:
+  name: bank-cluster
+  region: eu-west-1
+  version: "1.34"
+
+iam:
+  withOIDC: true
+  podIdentityAssociations:          # IAM for the AWS Load Balancer Controller (creates the NLB)
+    - namespace: kube-system
+      serviceAccountName: aws-load-balancer-controller
+      createServiceAccount: false
+      wellKnownPolicies:
+        awsLoadBalancerController: true
+
+addons:
+  - name: eks-pod-identity-agent
+  - name: vpc-cni
+    configurationValues: '{"enableNetworkPolicy":"true"}'
+  - name: aws-ebs-csi-driver        # gp3 volumes for Postgres/Kafka
+    useDefaultPodIdentityAssociations: true
+  - name: metrics-server            # for the HPAs
+  - name: coredns
+  - name: kube-proxy
+
+managedNodeGroups:                  # 3 worker nodes, one per role
+  - name: system
+    instanceType: m6i.large
+    desiredCapacity: 1
+    privateNetworking: true
+    labels: { workload: system }
+  - name: apps
+    instanceType: m6i.xlarge
+    desiredCapacity: 1
+    privateNetworking: true
+    labels: { workload: apps }
+  - name: data
+    instanceType: m6i.xlarge
+    desiredCapacity: 1
+    privateNetworking: true
+    labels: { workload: data }
+    taints:
+      - key: dedicated
+        value: data
+        effect: NoSchedule
