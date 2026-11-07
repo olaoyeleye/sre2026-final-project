@@ -1,6 +1,5 @@
 # =====================================================================
 # Transaction service (Spring Boot, port 8080)
-# Replace the image with the one pushed from ./transaction-service
 # =====================================================================
 apiVersion: v1
 kind: ServiceAccount
@@ -111,19 +110,6 @@ spec:
                 configMapKeyRef:
                   name: banking-config
                   key: REDIS_PORT
-            # Redis now requires auth. Spring Boot picks up
-            # SPRING_DATA_REDIS_PASSWORD automatically; REDIS_PASSWORD is
-            # provided too in case the app wires Redis config manually.
-            - name: REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: redis-secret
-                  key: REDIS_PASSWORD
-            - name: SPRING_DATA_REDIS_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: redis-secret
-                  key: REDIS_PASSWORD
             - name: FRONTEND_ORIGIN
               valueFrom:
                 configMapKeyRef:
@@ -169,56 +155,4 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: transaction-service
-  namespace: banking
-spec:
-  minAvailable: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: transaction-service
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: transaction-service
-  namespace: banking
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: transaction-service
-  minReplicas: 2
-  maxReplicas: 8
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: transaction-service
-  namespace: banking
-spec:
-  podSelector:
-    matchLabels:
-      app.kubernetes.io/name: transaction-service
-  policyTypes:
-    - Ingress
-  ingress:
-    - from:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: traefik
-          podSelector:
-            matchLabels:
-              app.kubernetes.io/name: traefik
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: finance-agent
-      ports:
-        - port: 8080
-          protocol: TCP
+  name:
