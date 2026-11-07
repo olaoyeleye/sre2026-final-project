@@ -36,8 +36,38 @@ spec:
   rules:
     # SPA
     - host: kunleoyeleye-bank.com
+        # SPA + Keycloak on the same domain
+    - host: kunleoyeleye-bank.com
       http:
         paths:
+          - path: /realms
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http
+          - path: /resources
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http
+          - path: /js
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  name: http
           - path: /
             pathType: Prefix
             backend:
@@ -45,17 +75,7 @@ spec:
                 name: frontend
                 port:
                   name: http
-    # Keycloak (issuer: https://auth.kunleoyeleye-bank.com/realms/banking)
-    - host: auth.kunleoyeleye-bank.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: keycloak
-                port:
-                  name: http
+      
     # User API
     - host: users.kunleoyeleye-bank.com
       http:
